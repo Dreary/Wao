@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35219.272
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Wao", "Wao\Wao.csproj", "{8448E58F-95AF-470C-AB08-8FDAEA6CE7FE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8448E58F-95AF-470C-AB08-8FDAEA6CE7FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8448E58F-95AF-470C-AB08-8FDAEA6CE7FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8448E58F-95AF-470C-AB08-8FDAEA6CE7FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8448E58F-95AF-470C-AB08-8FDAEA6CE7FE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5C3D59EC-E73C-436B-9FFC-E6091B0F5764}
+	EndGlobalSection
+EndGlobal
