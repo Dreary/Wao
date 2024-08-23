@@ -55,9 +55,9 @@ namespace Wao
 
         private void button5_Click(object sender, EventArgs e)
         {
-            ServerName = textBox1.Text;
-            ServerIP = textBox2.Text;
-            ServerPort = textBox3.Text;
+            ServerName = txtName.Text;
+            ServerIP = txtIp.Text;
+            ServerPort = txtPort.Text;
 
             // Simple validation to ensure all fields are filled
             if (string.IsNullOrWhiteSpace(ServerName) ||

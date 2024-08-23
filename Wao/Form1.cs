@@ -1,34 +1,90 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 namespace Wao
 {
-    public partial class Form1 : Form
+    public partial class Wao : Form
     {
         private string exePath;
         private string serversFilePath = Path.Combine(Application.StartupPath, "servers.txt");
+        private Dictionary<string, bool> serverStatuses = new Dictionary<string, bool>();
 
-        public Form1()
+        public Wao()
         {
             InitializeComponent();
             LoadExePath();
             LoadServers();
 
-            // Connect the Refresh button to its event handler
+            serverListBox.DrawMode = DrawMode.OwnerDrawFixed;
+            serverListBox.DrawItem += serverListBox_DrawItem;
+
             refreshBtn.Click += refreshBtn_Click;
+
+            Task.Run(() => PingServers());
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
 
+        }
+
+        private async Task PingServers()
+        {
+            while (true)
+            {
+                foreach (string serverName in serverListBox.Items)
+                {
+                    var serverDetails = GetServerDetails(serverName);
+                    if (serverDetails != null)
+                    {
+                        string ip = serverDetails[1];
+                        int port = int.Parse(serverDetails[2]);
+
+                        bool isOnline = await PingServerAsync(ip, port);
+                        serverStatuses[serverName] = isOnline;
+                    }
+                }
+
+                serverListBox.Invoke(new Action(() => serverListBox.Invalidate()));
+
+                // 60s delay before pinging again
+                await Task.Delay(60000);
+            }
+        }
+
+        private async Task<bool> PingServerAsync(string ip, int port)
+        {
+            try
+            {
+                using (TcpClient tcpClient = new TcpClient())
+                {
+                    var connectTask = tcpClient.ConnectAsync(ip, port);
+                    var timeoutTask = Task.Delay(5000); // 5 seconds timeout
+
+                    var completedTask = await Task.WhenAny(connectTask, timeoutTask);
+
+                    if (completedTask == connectTask && tcpClient.Connected)
+                    {
+                        return true; // Server is online and listening on the specified port
+                    }
+                    else
+                    {
+                        return false; // Connection timed out or failed
+                    }
+                }
+            }
+            catch
+            {
+                return false; // Connection failed
+            }
         }
 
         private void exitBtn_Click(object sender, EventArgs e)
@@ -65,10 +121,8 @@ namespace Wao
                     string serverIP = form2.ServerIP;
                     string serverPort = form2.ServerPort;
 
-                    // Add the server name to the ListBox
+                    // Add the server name to the ListBox + save it
                     serverListBox.Items.Add(serverName);
-
-                    // Save the server details to a text file
                     SaveServerToFile(serverName, serverIP, serverPort);
                 }
             }
@@ -98,78 +152,30 @@ namespace Wao
             }
         }
 
-        private void clientSelectBtn_Click(object sender, EventArgs e)
+        private void serverListBox_DrawItem(object sender, DrawItemEventArgs e)
         {
-            using (FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog())
+            if (e.Index < 0) return;
+
+            string serverName = serverListBox.Items[e.Index].ToString();
+
+            // Get the server status
+            bool isOnline = serverStatuses.ContainsKey(serverName) && serverStatuses[serverName];
+            e.DrawBackground();
+
+            // Draw the dot (green if online, red if offline)
+            Color dotColor = isOnline ? Color.Green : Color.Red;
+            using (Brush brush = new SolidBrush(dotColor))
             {
-                folderBrowserDialog.Description = "Select your MapleStory2 file location";
-
-                if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
-                {
-                    // Store the selected folder path
-                    exePath = folderBrowserDialog.SelectedPath;
-
-                    // Save the folder path for future use
-                    SaveExePath();
-
-                    // Show a message confirming the folder selection
-                    MessageBox.Show("MapleStory2 folder selected: " + "\n" + exePath);
-                }
+                e.Graphics.FillEllipse(brush, e.Bounds.Left + 2, e.Bounds.Top + 2, 10, 10);
             }
-        }
 
-        private void SaveExePath()
-        {
-            // Store the folder path in application settings
-            Properties.Settings.Default.ExePath = exePath;
-            Properties.Settings.Default.Save();
-        }
-
-        private void LoadExePath()
-        {
-            // Load the stored folder path
-            exePath = Properties.Settings.Default.ExePath;
-
-            if (string.IsNullOrEmpty(exePath) || !Directory.Exists(exePath))
+            // Draw the server name
+            using (Brush textBrush = new SolidBrush(e.ForeColor))
             {
-                MessageBox.Show("MapleStory2 folder not found or invalid path: " + "\n" + exePath);
+                e.Graphics.DrawString(serverName, e.Font, textBrush, e.Bounds.Left + 15, e.Bounds.Top);
             }
-            else
-            {
-                // No action needed, the path is valid
-            }
-        }
 
-
-        private void clientPathBtn_Click(object sender, EventArgs e)
-        {
-            if (!string.IsNullOrEmpty(exePath) && Directory.Exists(exePath))
-            {
-                // Open the directory in File Explorer
-                System.Diagnostics.Process.Start("explorer.exe", exePath);
-            }
-            else
-            {
-                MessageBox.Show("The folder path is not valid. Please select the folder again.");
-            }
-        }
-
-        private void serverListBox_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (serverListBox.SelectedItem != null)
-            {
-                string selectedServer = serverListBox.SelectedItem.ToString();
-                var serverDetails = GetServerDetails(selectedServer);
-
-                if (serverDetails != null)
-                {
-                    string ip = serverDetails[1];
-                    string port = serverDetails[2];
-
-                    // Use the IP and Port for launching the client, or store them for later use
-                    // MessageBox.Show($"Selected Server IP: {ip}, Port: {port}");
-                }
-            }
+            e.DrawFocusRectangle();
         }
 
         private string[] GetServerDetails(string serverName)
@@ -189,17 +195,82 @@ namespace Wao
             return null;
         }
 
+        private void serverListBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (serverListBox.SelectedItem != null)
+            {
+                string selectedServer = serverListBox.SelectedItem.ToString();
+                var serverDetails = GetServerDetails(selectedServer);
+
+                if (serverDetails != null)
+                {
+                    string ip = serverDetails[1];
+                    string port = serverDetails[2];
+                }
+            }
+        }
+
+        private void clientSelectBtn_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Filter = "Executable Files (*.exe)|*.exe";
+                openFileDialog.Title = "Select MapleStory2.exe";
+
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    // Store the selected exe path
+                    exePath = openFileDialog.FileName;
+                    SaveExePath();
+
+                    MessageBox.Show("MapleStory2.exe selected: " + "\n" + exePath);
+                }
+            }
+        }
+
+        private void SaveExePath()
+        {
+            Properties.Settings.Default.ExePath = exePath;
+            Properties.Settings.Default.Save();
+        }
+
+        private void LoadExePath()
+        {
+            exePath = Properties.Settings.Default.ExePath;
+
+            if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+            {
+                MessageBox.Show("MapleStory2.exe not found or invalid path: " + "\n" + exePath);
+            }
+        }
+
+        private void clientPathBtn_Click(object sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
+            {
+                string exeDirectory = Path.GetDirectoryName(exePath);
+
+                if (!string.IsNullOrEmpty(exeDirectory) && Directory.Exists(exeDirectory))
+                {
+                    System.Diagnostics.Process.Start("explorer.exe", exeDirectory);
+                }
+                else
+                {
+                    MessageBox.Show("The directory path is not valid. Please select the file again.");
+                }
+            }
+            else
+            {
+                MessageBox.Show("The file path is not valid. Please select the file again.");
+            }
+        }
+
         private void removeBtn_Click(object sender, EventArgs e)
         {
             if (serverListBox.SelectedItem != null)
             {
-                // Get the selected server name
                 string selectedServer = serverListBox.SelectedItem.ToString();
-
-                // Remove the server from the ListBox
                 serverListBox.Items.Remove(selectedServer);
-
-                // Remove the server details from the file
                 RemoveServerFromFile(selectedServer);
             }
             else
@@ -212,66 +283,16 @@ namespace Wao
         {
             if (File.Exists(serversFilePath))
             {
-                // Read all lines from the file
                 var lines = File.ReadAllLines(serversFilePath);
-
-                // Filter out the line that matches the server name
                 var updatedLines = lines.Where(line => !line.StartsWith(serverName + ":")).ToArray();
 
-                // Write the updated lines back to the file
                 File.WriteAllLines(serversFilePath, updatedLines);
             }
         }
 
         private void launchBtn_Click(object sender, EventArgs e)
         {
-            // Retrieve the stored folder path from the settings
-            string exeFolderPath = Properties.Settings.Default.ExePath;
-
-            // Check if the path is valid
-            if (!string.IsNullOrEmpty(exeFolderPath) && Directory.Exists(exeFolderPath))
-            {
-                // Construct the path to the x64 folder
-                string x64FolderPath = Path.Combine(exeFolderPath, "x64");
-
-                // Check if the x64 folder exists
-                if (Directory.Exists(x64FolderPath))
-                {
-                    try
-                    {
-                        // Construct the full path to the executable inside the x64 folder
-                        string exeFullPath = Path.Combine(x64FolderPath, "MapleStory2.exe");
-
-                        // Check if the executable exists
-                        if (File.Exists(exeFullPath))
-                        {
-                            // Launch the executable
-                            System.Diagnostics.Process.Start(exeFullPath);
-                        }
-                        else
-                        {
-                            MessageBox.Show("MapleStory2.exe not found in the x64 folder.");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        // Handle any errors that might occur during launch
-                        MessageBox.Show("Failed to launch the executable: " + ex.Message);
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("x64 folder not found in the selected directory.");
-                }
-            }
-            else
-            {
-                MessageBox.Show("Folder path is not valid. Please set the correct path.");
-            }
-        }
-
-        private void setServerBtn_Click(object sender, EventArgs e)
-        {
+            // Check if a server is selected in the ListBox
             if (serverListBox.SelectedItem != null)
             {
                 string selectedServer = serverListBox.SelectedItem.ToString();
@@ -283,48 +304,61 @@ namespace Wao
                     string serverIP = serverDetails[1];
                     string serverPort = serverDetails[2];
 
-                    string exeFolderPath = Properties.Settings.Default.ExePath;
-
-                    string x64FolderPath = Path.Combine(exeFolderPath, "x64");
-
-                    string iniFilePath = Path.Combine(x64FolderPath, "maple2.ini");
-
-                    // Check if the maple2.ini file exists
-                    if (File.Exists(iniFilePath))
+                    if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
                     {
+                        string exeDirectory = Path.GetDirectoryName(exePath);
+                        string iniFilePath = Path.Combine(exeDirectory, "maple2.ini");
+
+                        if (File.Exists(iniFilePath))
+                        {
+                            try
+                            {
+                                var lines = File.ReadAllLines(iniFilePath);
+
+                                // Replace the relevant fields in the .ini file
+                                for (int i = 0; i < lines.Length; i++)
+                                {
+                                    if (lines[i].StartsWith("name="))
+                                    {
+                                        lines[i] = "name=" + serverName;
+                                    }
+                                    else if (lines[i].StartsWith("host="))
+                                    {
+                                        lines[i] = "host=" + serverIP;
+                                    }
+                                    else if (lines[i].StartsWith("port="))
+                                    {
+                                        lines[i] = "port=" + serverPort;
+                                    }
+                                }
+
+                                File.WriteAllLines(iniFilePath, lines);
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show("Failed to update the ini file: " + ex.Message);
+                                return; 
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show("maple2.ini file not found in the selected directory.");
+                            return; 
+                        }
+
+                        // Launch the executable after updating the .ini file
                         try
                         {
-                            var lines = File.ReadAllLines(iniFilePath);
-
-                            // Replace the relevant fields
-                            for (int i = 0; i < lines.Length; i++)
-                            {
-                                if (lines[i].StartsWith("name="))
-                                {
-                                    lines[i] = "name=" + serverName;
-                                }
-                                else if (lines[i].StartsWith("host="))
-                                {
-                                    lines[i] = "host=" + serverIP;
-                                }
-                                else if (lines[i].StartsWith("port="))
-                                {
-                                    lines[i] = "port=" + serverPort;
-                                }
-                            }
-
-                            File.WriteAllLines(iniFilePath, lines);
-
-                            MessageBox.Show("maple2.ini updated successfully.");
+                            System.Diagnostics.Process.Start(exePath);
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show("Failed to update the ini file: " + ex.Message);
+                            MessageBox.Show("Failed to launch the executable: " + ex.Message);
                         }
                     }
                     else
                     {
-                        MessageBox.Show("maple2.ini file not found in the x64 folder.");
+                        MessageBox.Show("File path is not valid. Please select the file again.");
                     }
                 }
                 else
@@ -338,10 +372,78 @@ namespace Wao
             }
         }
 
-        private void refreshBtn_Click(object sender, EventArgs e)
+        private async Task PingAndUpdateServers()
+        {
+            // Make a copy of the server names for safe iteration
+            var serverNames = serverListBox.Items.Cast<string>().ToList();
+
+            foreach (string serverName in serverNames)
+            {
+                var serverDetails = GetServerDetails(serverName);
+                if (serverDetails != null)
+                {
+                    string ip = serverDetails[1];
+                    int port = int.Parse(serverDetails[2]);
+
+                    bool isOnline = await PingServerAsync(ip, port);
+
+                    this.Invoke((MethodInvoker)delegate {
+                        serverStatuses[serverName] = isOnline;
+                        serverListBox.Invalidate(); // Redraw to reflect the change
+                    });
+                }
+            }
+        }
+
+        private async void refreshBtn_Click(object sender, EventArgs e)
+        {
+            RefreshServers();
+            await PingAndUpdateServers();
+        }
+
+        private void editBtn_Click(object sender, EventArgs e)
+        {
+            if (serverListBox.SelectedItem != null)
+            {
+                string selectedServer = serverListBox.SelectedItem.ToString();
+                var serverDetails = GetServerDetails(selectedServer);
+                if (serverDetails != null)
+                {
+                    using (Form3 form3 = new Form3(serverDetails[0], serverDetails[1], serverDetails[2]))
+                    {
+                        if (form3.ShowDialog() == DialogResult.OK)
+                        {
+                            // Update the server in the text file
+                            UpdateServerInFile(serverDetails[0], form3.ServerName, form3.ServerIP, form3.ServerPort);
+
+                            // Refresh the ListBox
+                            RefreshServers();
+                        }
+                    }
+                }
+            }
+            else
+            {
+                MessageBox.Show("Please select a server to edit.");
+            }
+        }
+
+        private void UpdateServerInFile(string oldName, string newName, string newIP, string newPort)
+        {
+            var lines = File.ReadAllLines(serversFilePath).ToList();
+            int index = lines.FindIndex(line => line.StartsWith(oldName + ":"));
+            if (index != -1)
+            {
+                lines[index] = $"{newName}:{newIP}:{newPort}";
+                File.WriteAllLines(serversFilePath, lines);
+            }
+        }
+
+        private void RefreshServers()
         {
             serverListBox.Items.Clear();
             LoadServers();
         }
-    } 
+
+    }
 }
