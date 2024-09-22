@@ -41,6 +41,14 @@
             this.label1 = new System.Windows.Forms.Label();
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.editBtn = new System.Windows.Forms.Button();
+            this.chBoxXml = new System.Windows.Forms.CheckBox();
+            this.chBoxImage = new System.Windows.Forms.CheckBox();
+            this.btnExtractXml = new System.Windows.Forms.Button();
+            this.btnExtractImage = new System.Windows.Forms.Button();
+            this.btnZinXml = new System.Windows.Forms.Button();
+            this.progressBar1 = new System.Windows.Forms.ProgressBar();
+            this.lblStatus = new System.Windows.Forms.Label();
+            this.btnModPath = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // serverListBox
@@ -104,7 +112,7 @@
             this.clientSelectBtn.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
             this.clientSelectBtn.Location = new System.Drawing.Point(294, 29);
             this.clientSelectBtn.Name = "clientSelectBtn";
-            this.clientSelectBtn.Size = new System.Drawing.Size(103, 53);
+            this.clientSelectBtn.Size = new System.Drawing.Size(103, 38);
             this.clientSelectBtn.TabIndex = 5;
             this.clientSelectBtn.Text = "Select your /x64/ MapleStory2.exe";
             this.clientSelectBtn.UseVisualStyleBackColor = false;
@@ -115,7 +123,7 @@
             this.clientPathBtn.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(11)))), ((int)(((byte)(18)))));
             this.clientPathBtn.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.clientPathBtn.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
-            this.clientPathBtn.Location = new System.Drawing.Point(294, 88);
+            this.clientPathBtn.Location = new System.Drawing.Point(294, 74);
             this.clientPathBtn.Name = "clientPathBtn";
             this.clientPathBtn.Size = new System.Drawing.Size(103, 23);
             this.clientPathBtn.TabIndex = 6;
@@ -128,11 +136,11 @@
             this.refreshBtn.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(11)))), ((int)(((byte)(18)))));
             this.refreshBtn.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.refreshBtn.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
-            this.refreshBtn.Location = new System.Drawing.Point(294, 117);
+            this.refreshBtn.Location = new System.Drawing.Point(294, 134);
             this.refreshBtn.Name = "refreshBtn";
-            this.refreshBtn.Size = new System.Drawing.Size(103, 40);
+            this.refreshBtn.Size = new System.Drawing.Size(103, 23);
             this.refreshBtn.TabIndex = 7;
-            this.refreshBtn.Text = "Refresh Server List";
+            this.refreshBtn.Text = "Refresh List";
             this.refreshBtn.UseVisualStyleBackColor = false;
             this.refreshBtn.Click += new System.EventHandler(this.refreshBtn_Click);
             // 
@@ -192,12 +200,113 @@
             this.editBtn.UseVisualStyleBackColor = false;
             this.editBtn.Click += new System.EventHandler(this.editBtn_Click);
             // 
+            // chBoxXml
+            // 
+            this.chBoxXml.AutoSize = true;
+            this.chBoxXml.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
+            this.chBoxXml.Location = new System.Drawing.Point(277, 203);
+            this.chBoxXml.Name = "chBoxXml";
+            this.chBoxXml.Size = new System.Drawing.Size(117, 17);
+            this.chBoxXml.TabIndex = 12;
+            this.chBoxXml.Text = "Load modified XML";
+            this.chBoxXml.UseVisualStyleBackColor = true;
+            // 
+            // chBoxImage
+            // 
+            this.chBoxImage.AutoSize = true;
+            this.chBoxImage.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
+            this.chBoxImage.Location = new System.Drawing.Point(277, 222);
+            this.chBoxImage.Name = "chBoxImage";
+            this.chBoxImage.Size = new System.Drawing.Size(124, 17);
+            this.chBoxImage.TabIndex = 13;
+            this.chBoxImage.Text = "Load modified Image";
+            this.chBoxImage.UseVisualStyleBackColor = true;
+            // 
+            // btnExtractXml
+            // 
+            this.btnExtractXml.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(11)))), ((int)(((byte)(18)))));
+            this.btnExtractXml.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnExtractXml.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
+            this.btnExtractXml.Location = new System.Drawing.Point(89, 201);
+            this.btnExtractXml.Name = "btnExtractXml";
+            this.btnExtractXml.Size = new System.Drawing.Size(87, 39);
+            this.btnExtractXml.TabIndex = 14;
+            this.btnExtractXml.Text = "Extract Xml";
+            this.btnExtractXml.UseVisualStyleBackColor = false;
+            this.btnExtractXml.Click += new System.EventHandler(this.btnExtractXml_Click);
+            // 
+            // btnExtractImage
+            // 
+            this.btnExtractImage.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(11)))), ((int)(((byte)(18)))));
+            this.btnExtractImage.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnExtractImage.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
+            this.btnExtractImage.Location = new System.Drawing.Point(182, 201);
+            this.btnExtractImage.Name = "btnExtractImage";
+            this.btnExtractImage.Size = new System.Drawing.Size(87, 39);
+            this.btnExtractImage.TabIndex = 15;
+            this.btnExtractImage.Text = "Extract Image";
+            this.btnExtractImage.UseVisualStyleBackColor = false;
+            this.btnExtractImage.Click += new System.EventHandler(this.btnExtractImage_Click);
+            // 
+            // btnZinXml
+            // 
+            this.btnZinXml.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(11)))), ((int)(((byte)(18)))));
+            this.btnZinXml.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnZinXml.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
+            this.btnZinXml.Location = new System.Drawing.Point(4, 201);
+            this.btnZinXml.Name = "btnZinXml";
+            this.btnZinXml.Size = new System.Drawing.Size(79, 39);
+            this.btnZinXml.TabIndex = 16;
+            this.btnZinXml.Text = "Download Zin\'s XML";
+            this.btnZinXml.UseVisualStyleBackColor = false;
+            this.btnZinXml.Click += new System.EventHandler(this.btnZinXml_Click);
+            // 
+            // progressBar1
+            // 
+            this.progressBar1.Location = new System.Drawing.Point(89, 247);
+            this.progressBar1.Name = "progressBar1";
+            this.progressBar1.Size = new System.Drawing.Size(305, 10);
+            this.progressBar1.TabIndex = 17;
+            // 
+            // lblStatus
+            // 
+            this.lblStatus.AutoSize = true;
+            this.lblStatus.BackColor = System.Drawing.Color.Transparent;
+            this.lblStatus.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
+            this.lblStatus.Location = new System.Drawing.Point(3, 244);
+            this.lblStatus.Name = "lblStatus";
+            this.lblStatus.Size = new System.Drawing.Size(10, 13);
+            this.lblStatus.TabIndex = 18;
+            this.lblStatus.Text = " ";
+            this.lblStatus.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            // 
+            // btnModPath
+            // 
+            this.btnModPath.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(11)))), ((int)(((byte)(18)))));
+            this.btnModPath.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnModPath.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(197)))), ((int)(((byte)(123)))), ((int)(((byte)(224)))));
+            this.btnModPath.Location = new System.Drawing.Point(294, 104);
+            this.btnModPath.Name = "btnModPath";
+            this.btnModPath.Size = new System.Drawing.Size(103, 23);
+            this.btnModPath.TabIndex = 19;
+            this.btnModPath.Text = "Open Mod Path";
+            this.btnModPath.UseVisualStyleBackColor = false;
+            this.btnModPath.Click += new System.EventHandler(this.btnModPath_Click);
+            // 
             // Wao
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(15)))), ((int)(((byte)(20)))));
-            this.ClientSize = new System.Drawing.Size(401, 200);
+            this.ClientSize = new System.Drawing.Size(401, 263);
+            this.Controls.Add(this.btnModPath);
+            this.Controls.Add(this.lblStatus);
+            this.Controls.Add(this.progressBar1);
+            this.Controls.Add(this.btnZinXml);
+            this.Controls.Add(this.btnExtractImage);
+            this.Controls.Add(this.btnExtractXml);
+            this.Controls.Add(this.chBoxImage);
+            this.Controls.Add(this.chBoxXml);
             this.Controls.Add(this.editBtn);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.minimiseBtn);
@@ -237,6 +346,14 @@
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.OpenFileDialog openFileDialog1;
         private System.Windows.Forms.Button editBtn;
+        private System.Windows.Forms.CheckBox chBoxXml;
+        private System.Windows.Forms.CheckBox chBoxImage;
+        private System.Windows.Forms.Button btnExtractXml;
+        private System.Windows.Forms.Button btnExtractImage;
+        private System.Windows.Forms.Button btnZinXml;
+        private System.Windows.Forms.ProgressBar progressBar1;
+        private System.Windows.Forms.Label lblStatus;
+        private System.Windows.Forms.Button btnModPath;
     }
 }
 

@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.IO;
+using System.Net.Http;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Diagnostics;
+using Newtonsoft.Json.Linq;
 
 namespace Wao
 {
@@ -22,10 +24,8 @@ namespace Wao
             InitializeComponent();
             LoadExePath();
             LoadServers();
-
             serverListBox.DrawMode = DrawMode.OwnerDrawFixed;
             serverListBox.DrawItem += serverListBox_DrawItem;
-
             refreshBtn.Click += refreshBtn_Click;
 
             Task.Run(() => PingServers());
@@ -38,54 +38,44 @@ namespace Wao
 
         private async Task PingServers()
         {
+            // Initial ping of the servers right away when the form opens
+            await PingAndUpdateServers();
+
+            // Start the continuous pinging process every 15 seconds
             while (true)
             {
-                foreach (string serverName in serverListBox.Items)
-                {
-                    var serverDetails = GetServerDetails(serverName);
-                    if (serverDetails != null)
-                    {
-                        string ip = serverDetails[1];
-                        int port = int.Parse(serverDetails[2]);
-
-                        bool isOnline = await PingServerAsync(ip, port);
-                        serverStatuses[serverName] = isOnline;
-                    }
-                }
-
-                serverListBox.Invoke(new Action(() => serverListBox.Invalidate()));
-
-                // 60s delay before pinging again
-                await Task.Delay(60000);
+                // Wait for 15 seconds between each ping cycle
+                await Task.Delay(15000);
             }
         }
 
-        private async Task<bool> PingServerAsync(string ip, int port)
+        private async Task<bool> PingServerAsync(string ip, int port, int timeout = 1000) // 1 second for the first ping
         {
             try
             {
                 using (TcpClient tcpClient = new TcpClient())
                 {
                     var connectTask = tcpClient.ConnectAsync(ip, port);
-                    var timeoutTask = Task.Delay(5000); // 5 seconds timeout
+                    var timeoutTask = Task.Delay(timeout);
 
                     var completedTask = await Task.WhenAny(connectTask, timeoutTask);
 
                     if (completedTask == connectTask && tcpClient.Connected)
                     {
-                        return true; // Server is online and listening on the specified port
+                        return true;
                     }
                     else
                     {
-                        return false; // Connection timed out or failed
+                        return false;
                     }
                 }
             }
             catch
             {
-                return false; // Connection failed
+                return false;
             }
         }
+
 
         private void exitBtn_Click(object sender, EventArgs e)
         {
@@ -121,7 +111,6 @@ namespace Wao
                     string serverIP = form2.ServerIP;
                     string serverPort = form2.ServerPort;
 
-                    // Add the server name to the ListBox + save it
                     serverListBox.Items.Add(serverName);
                     SaveServerToFile(serverName, serverIP, serverPort);
                 }
@@ -158,7 +147,6 @@ namespace Wao
 
             string serverName = serverListBox.Items[e.Index].ToString();
 
-            // Get the server status
             bool isOnline = serverStatuses.ContainsKey(serverName) && serverStatuses[serverName];
             e.DrawBackground();
 
@@ -292,85 +280,131 @@ namespace Wao
 
         private void launchBtn_Click(object sender, EventArgs e)
         {
-            // Check if a server is selected in the ListBox
-            if (serverListBox.SelectedItem != null)
+            try
             {
-                string selectedServer = serverListBox.SelectedItem.ToString();
-                var serverDetails = GetServerDetails(selectedServer);
+                // Check if Xml or Image checkboxes are checked
+                bool isXmlChecked = chBoxXml.Checked;
+                bool isImageChecked = chBoxImage.Checked;
 
-                if (serverDetails != null)
+                // If neither Xml nor Image is checked, proceed directly to launch the game
+                if (!isXmlChecked && !isImageChecked)
                 {
-                    string serverName = serverDetails[0];
-                    string serverIP = serverDetails[1];
-                    string serverPort = serverDetails[2];
-
-                    if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
-                    {
-                        string exeDirectory = Path.GetDirectoryName(exePath);
-                        string iniFilePath = Path.Combine(exeDirectory, "maple2.ini");
-
-                        if (File.Exists(iniFilePath))
-                        {
-                            try
-                            {
-                                var lines = File.ReadAllLines(iniFilePath);
-
-                                // Replace the relevant fields in the .ini file
-                                for (int i = 0; i < lines.Length; i++)
-                                {
-                                    if (lines[i].StartsWith("name="))
-                                    {
-                                        lines[i] = "name=" + serverName;
-                                    }
-                                    else if (lines[i].StartsWith("host="))
-                                    {
-                                        lines[i] = "host=" + serverIP;
-                                    }
-                                    else if (lines[i].StartsWith("port="))
-                                    {
-                                        lines[i] = "port=" + serverPort;
-                                    }
-                                }
-
-                                File.WriteAllLines(iniFilePath, lines);
-                            }
-                            catch (Exception ex)
-                            {
-                                MessageBox.Show("Failed to update the ini file: " + ex.Message);
-                                return; 
-                            }
-                        }
-                        else
-                        {
-                            MessageBox.Show("maple2.ini file not found in the selected directory.");
-                            return; 
-                        }
-
-                        // Launch the executable after updating the .ini file
-                        try
-                        {
-                            System.Diagnostics.Process.Start(exePath);
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show("Failed to launch the executable: " + ex.Message);
-                        }
-                    }
-                    else
-                    {
-                        MessageBox.Show("File path is not valid. Please select the file again.");
-                    }
+                    LaunchGame();
                 }
                 else
                 {
-                    MessageBox.Show("Failed to retrieve server details.");
+                    formLaunchOption launchOptionForm = new formLaunchOption(exePath);
+
+                    if (launchOptionForm.ShowDialog() == DialogResult.OK)
+                    {
+                        string mode = launchOptionForm.radioAsync.Checked ? "0" : "1"; // 0 for Async, 1 for Sync
+                        string logLevel = "0"; // Log level 2 = Info (MS2Tools)
+
+                        string toolsFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools");
+                        string ms2CreatePath = Path.Combine(toolsFolderPath, "MS2Create.exe");
+
+                        if (!File.Exists(ms2CreatePath))
+                        {
+                            MessageBox.Show("MS2Create.exe not found in the Tools folder.");
+                            return;
+                        }
+
+                        string waoExeFolderPath = AppDomain.CurrentDomain.BaseDirectory;
+                        string exeDirForPacking = Path.GetDirectoryName(exePath);
+                        string rootDirectory = Directory.GetParent(exeDirForPacking).FullName;
+                        string dataFolderPath = Path.Combine(rootDirectory, "Data");
+                        string resourceFolderPath = Path.Combine(dataFolderPath, "Resource");
+
+                        // Pack Xml if checked
+                        if (isXmlChecked)
+                        {
+                            string xmlSourcePath = Path.Combine(waoExeFolderPath, "Xml");
+                            string xmlDestinationPath = dataFolderPath;
+                            string xmlArchiveName = "Xml";
+
+                            // Run MS2Create.exe for Xml and wait for the process to complete
+                            RunMs2CreateCommand(ms2CreatePath, xmlSourcePath, xmlDestinationPath, xmlArchiveName, mode, logLevel);
+                        }
+
+                        // Pack Image if checked
+                        if (isImageChecked)
+                        {
+                            string imageSourcePath = Path.Combine(waoExeFolderPath, "Image");
+                            string imageDestinationPath = resourceFolderPath;
+                            string imageArchiveName = "Image";
+
+                            // Run MS2Create.exe for Image and wait for the process to complete
+                            RunMs2CreateCommand(ms2CreatePath, imageSourcePath, imageDestinationPath, imageArchiveName, mode, logLevel);
+                        }
+
+                        // After packing, proceed to launch the game
+                        LaunchGame();
+                    }
                 }
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("Please select a server from the list.");
+                MessageBox.Show("An error occurred: " + ex.Message);
             }
         }
+
+
+        private void RunMs2CreateCommand(string ms2CreatePath, string source, string destination, string archiveName, string mode, string logLevel)
+        {
+            try
+            {
+                // Prepare the command for MS2Create.exe with the mode and log level
+                string command = $"{ms2CreatePath} {source} {destination} {archiveName} MS2F {mode} {logLevel}";
+
+                // Run the command in cmd.exe
+                ProcessStartInfo processStartInfo = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c {command}", // Use /c to close the command prompt window after execution
+                    UseShellExecute = false,     // False to allow waiting for the process to exit
+                    CreateNoWindow = false       // Show the command prompt window
+                };
+
+                using (Process process = Process.Start(processStartInfo))
+                {
+                    // Wait for the process to complete
+                    process.WaitForExit();
+
+                    if (process.ExitCode == 0)
+                    {
+                        MessageBox.Show($"{archiveName} repacking completed successfully.");
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Error repacking {archiveName}. Exit code: {process.ExitCode}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred while repacking {archiveName}: {ex.Message}");
+            }
+        }
+
+        private void LaunchGame()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(exePath) && File.Exists(exePath))
+                {
+                    System.Diagnostics.Process.Start(exePath);
+                }
+                else
+                {
+                    MessageBox.Show("File path is not valid. Please select the file again.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to launch the executable: " + ex.Message);
+            }
+        }
+
 
         private async Task PingAndUpdateServers()
         {
@@ -445,5 +479,206 @@ namespace Wao
             LoadServers();
         }
 
+        private async void btnZinXml_Click(object sender, EventArgs e)
+        {
+            await DownloadAndReplaceZinsXmlFiles();
+        }
+
+        private async Task DownloadAndReplaceZinsXmlFiles()
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+                {
+                    MessageBox.Show("Please select a valid MapleStory2.exe before proceeding.");
+                    return;
+                }
+
+                // Navigate up one directory from the x64 client folder to find the Data folder
+                string exeDirectory = Path.GetDirectoryName(exePath);
+                string rootDirectory = Directory.GetParent(exeDirectory).FullName;
+                string dataFolderPath = Path.Combine(rootDirectory, "Data");
+
+                // Ensure the Data folder exists
+                if (!Directory.Exists(dataFolderPath))
+                {
+                    MessageBox.Show("The Data folder does not exist. Please verify the client path.");
+                    return;
+                }
+
+                // Create Backup Folder if it doesn't exist
+                string backupFolderPath = Path.Combine(dataFolderPath, "! Backup");
+                if (!Directory.Exists(backupFolderPath))
+                {
+                    Directory.CreateDirectory(backupFolderPath);
+                }
+
+                // Files to be backed up and replaced
+                string[] filesToBackup = { "Image.m2d", "Image.m2h", "Xml.m2d", "Xml.m2h" };
+
+                // Backup existing files
+                foreach (var fileName in filesToBackup)
+                {
+                    string filePath = Path.Combine(dataFolderPath, fileName);
+                    string backupFilePath = Path.Combine(backupFolderPath, fileName);
+
+                    if (File.Exists(filePath))
+                    {
+                        File.Copy(filePath, backupFilePath, true);
+                    }
+                }
+
+                // Get the latest release assets from GitHub API
+                string apiUrl = "https://api.github.com/repos/Zintixx/MapleStory2-XML/releases/latest";
+                HttpClient client = new HttpClient();
+
+                // GitHub requires a user-agent for requests
+                client.DefaultRequestHeaders.Add("User-Agent", "MapleStory2-XML-Downloader");
+
+                var response = await client.GetStringAsync(apiUrl);
+                var releaseData = JObject.Parse(response);
+                var assets = releaseData["assets"];
+
+                // Find the necessary files in the assets
+                Dictionary<string, string> downloadUrls = new Dictionary<string, string>();
+                foreach (var asset in assets)
+                {
+                    string name = asset["name"].ToString();
+                    string downloadUrl = asset["browser_download_url"].ToString();
+
+                    if (name == "Server.m2d" || name == "Server.m2h" || name == "Xml.m2d" || name == "Xml.m2h")
+                    {
+                        downloadUrls[name] = downloadUrl;
+                    }
+                }
+
+                if (downloadUrls.Count < 4)
+                {
+                    MessageBox.Show("Failed to locate all necessary files in the release.");
+                    return;
+                }
+
+                // Track the download stage
+                int fileCounter = 1;
+                int totalFiles = downloadUrls.Count;
+
+                // Download and replace the files
+                foreach (var fileUrl in downloadUrls)
+                {
+                    string fileName = fileUrl.Key;
+                    string destinationPath = Path.Combine(dataFolderPath, fileName);
+
+                    // Update the label with the current file and stage
+                    UpdateLabelStatus($"{fileName} ({fileCounter}/{totalFiles})");
+
+                    await DownloadFileAsync(fileUrl.Value, destinationPath);
+
+                    fileCounter++; // Increment the file counter after each download
+                }
+
+                // Reset the status after completion
+                UpdateLabelStatus("Done!");
+                MessageBox.Show("Files downloaded and replaced successfully.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("An error occurred: " + ex.Message);
+            }
+        }
+
+        private void UpdateLabelStatus(string message)
+        {
+            // Ensure the label update is on the UI thread
+            if (InvokeRequired)
+            {
+                Invoke(new Action<string>(UpdateLabelStatus), message);
+            }
+            else
+            {
+                lblStatus.Text = message;
+            }
+        }
+
+
+        private async Task DownloadFileAsync(string url, string destinationPath)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+
+                // Get the total size of the file
+                long totalBytes = response.Content.Headers.ContentLength ?? -1;
+                long totalBytesRead = 0;
+                byte[] buffer = new byte[8192];  // Buffer for chunks of data
+
+                using (var fs = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                using (var stream = await response.Content.ReadAsStreamAsync())
+                {
+                    int bytesRead;
+                    while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    {
+                        await fs.WriteAsync(buffer, 0, bytesRead);
+                        totalBytesRead += bytesRead;
+
+                        // If we know the total size of the file, update the progress bar
+                        if (totalBytes != -1)
+                        {
+                            int progressPercentage = (int)((totalBytesRead * 100) / totalBytes);
+                            UpdateProgressBar(progressPercentage);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void UpdateProgressBar(int progressPercentage)
+        {
+            // Ensure this runs on the UI thread
+            if (InvokeRequired)
+            {
+                Invoke(new Action<int>(UpdateProgressBar), progressPercentage);
+            }
+            else
+            {
+                progressBar1.Value = progressPercentage;
+            }
+        }
+
+        private void btnExtractXml_Click(object sender, EventArgs e)
+        {
+            formExtractOption extractOptionForm = new formExtractOption(exePath, progressBar1);
+            extractOptionForm.ShowDialog();
+        }
+
+        private void btnExtractImage_Click(object sender, EventArgs e)
+        {
+            formExtractImage extractImageForm = new formExtractImage(exePath, progressBar1);
+            extractImageForm.ShowDialog();
+        }
+
+        private void btnModPath_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Get the directory where the Wao.exe is located
+                string waoExeFolderPath = AppDomain.CurrentDomain.BaseDirectory;
+
+                // Check if the folder exists before opening it
+                if (Directory.Exists(waoExeFolderPath))
+                {
+                    // Open the folder in Windows Explorer
+                    System.Diagnostics.Process.Start("explorer.exe", waoExeFolderPath);
+                }
+                else
+                {
+                    MessageBox.Show("The directory path is not valid or does not exist.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("An error occurred: " + ex.Message);
+            }
+        }
     }
 }
