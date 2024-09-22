@@ -1,5 +1,5 @@
 # Wao - MapleStory 2 launcher
-![image](https://github.com/user-attachments/assets/1b2e3661-bbd1-4472-93d4-872772a1bb67)
+![Wao_aGec8iTSCR](https://github.com/user-attachments/assets/c1e6ba43-4400-41b5-810b-547e153c9bd0)
 
 
 ## Features
@@ -7,6 +7,9 @@
 - Remembers both the servers and client path you select.
 - Adds the server you add + select into the maple2.ini of your client.
 - Shows online/offline statuses of servers (automatic every 60s, otherwise can manually refresh)
+- Download the latest Xml from Zin's Xml branch to your MS2 client
+- Extract Xml/Image m2d/m2h resources from your client
+- Able to load the modified xml/image folders to your client which you generated from extracting via checkboxes
 
 ## Required technology
 - A MapleStory 2 client injected with the Maple2.dll
