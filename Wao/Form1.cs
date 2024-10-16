@@ -278,69 +278,68 @@ namespace Wao
             }
         }
 
+        private void UpdateMaple2Ini(string txtName, string txtIp, string txtPort)
+        {
+            string iniFilePath = Path.Combine(Path.GetDirectoryName(exePath), "maple2.ini");
+
+            if (File.Exists(iniFilePath))
+            {
+                var lines = File.ReadAllLines(iniFilePath).ToList();
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    if (lines[i].StartsWith("name="))
+                    {
+                        lines[i] = $"name={txtName}";
+                    }
+
+                    if (lines[i].StartsWith("host="))
+                    {
+                        lines[i] = $"host={txtIp}";
+                    }
+
+                    if (lines[i].StartsWith("port="))
+                    {
+                        lines[i] = $"port={txtPort}";
+                    }
+                }
+
+                File.WriteAllLines(iniFilePath, lines);
+            }
+            else
+            {
+                MessageBox.Show("maple2.ini file not found.");
+            }
+        }
+
         private void launchBtn_Click(object sender, EventArgs e)
         {
             try
             {
-                // Check if Xml or Image checkboxes are checked
-                bool isXmlChecked = chBoxXml.Checked;
-                bool isImageChecked = chBoxImage.Checked;
-
-                // If neither Xml nor Image is checked, proceed directly to launch the game
-                if (!isXmlChecked && !isImageChecked)
+                if (serverListBox.SelectedItem == null)
                 {
-                    LaunchGame();
+                    MessageBox.Show("Please select a server before launching.");
+                    return;
                 }
-                else
+
+                string selectedServer = serverListBox.SelectedItem.ToString();
+
+                var serverDetails = GetServerDetails(selectedServer);
+
+                if (serverDetails == null)
                 {
-                    formLaunchOption launchOptionForm = new formLaunchOption(exePath);
-
-                    if (launchOptionForm.ShowDialog() == DialogResult.OK)
-                    {
-                        string mode = launchOptionForm.radioAsync.Checked ? "0" : "1"; // 0 for Async, 1 for Sync
-                        string logLevel = "0"; // Log level 2 = Info (MS2Tools)
-
-                        string toolsFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tools");
-                        string ms2CreatePath = Path.Combine(toolsFolderPath, "MS2Create.exe");
-
-                        if (!File.Exists(ms2CreatePath))
-                        {
-                            MessageBox.Show("MS2Create.exe not found in the Tools folder.");
-                            return;
-                        }
-
-                        string waoExeFolderPath = AppDomain.CurrentDomain.BaseDirectory;
-                        string exeDirForPacking = Path.GetDirectoryName(exePath);
-                        string rootDirectory = Directory.GetParent(exeDirForPacking).FullName;
-                        string dataFolderPath = Path.Combine(rootDirectory, "Data");
-                        string resourceFolderPath = Path.Combine(dataFolderPath, "Resource");
-
-                        // Pack Xml if checked
-                        if (isXmlChecked)
-                        {
-                            string xmlSourcePath = Path.Combine(waoExeFolderPath, "Xml");
-                            string xmlDestinationPath = dataFolderPath;
-                            string xmlArchiveName = "Xml";
-
-                            // Run MS2Create.exe for Xml and wait for the process to complete
-                            RunMs2CreateCommand(ms2CreatePath, xmlSourcePath, xmlDestinationPath, xmlArchiveName, mode, logLevel);
-                        }
-
-                        // Pack Image if checked
-                        if (isImageChecked)
-                        {
-                            string imageSourcePath = Path.Combine(waoExeFolderPath, "Image");
-                            string imageDestinationPath = resourceFolderPath;
-                            string imageArchiveName = "Image";
-
-                            // Run MS2Create.exe for Image and wait for the process to complete
-                            RunMs2CreateCommand(ms2CreatePath, imageSourcePath, imageDestinationPath, imageArchiveName, mode, logLevel);
-                        }
-
-                        // After packing, proceed to launch the game
-                        LaunchGame();
-                    }
+                    MessageBox.Show("Server details could not be found.");
+                    return;
                 }
+
+                // Extract txtName, txtIp (now host), and txtPort from the server details (expected format: Name:Host:Port)
+                string txtName = serverDetails[0];
+                string txtIp = serverDetails[1];
+                string txtPort = serverDetails[2];
+
+                UpdateMaple2Ini(txtName, txtIp, txtPort);
+
+                LaunchGame();
             }
             catch (Exception ex)
             {
@@ -348,26 +347,22 @@ namespace Wao
             }
         }
 
-
         private void RunMs2CreateCommand(string ms2CreatePath, string source, string destination, string archiveName, string mode, string logLevel)
         {
             try
             {
-                // Prepare the command for MS2Create.exe with the mode and log level
                 string command = $"{ms2CreatePath} {source} {destination} {archiveName} MS2F {mode} {logLevel}";
 
-                // Run the command in cmd.exe
                 ProcessStartInfo processStartInfo = new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/c {command}", // Use /c to close the command prompt window after execution
-                    UseShellExecute = false,     // False to allow waiting for the process to exit
-                    CreateNoWindow = false       // Show the command prompt window
+                    Arguments = $"/c {command}",
+                    UseShellExecute = false,
+                    CreateNoWindow = false
                 };
 
                 using (Process process = Process.Start(processStartInfo))
                 {
-                    // Wait for the process to complete
                     process.WaitForExit();
 
                     if (process.ExitCode == 0)
@@ -408,7 +403,6 @@ namespace Wao
 
         private async Task PingAndUpdateServers()
         {
-            // Make a copy of the server names for safe iteration
             var serverNames = serverListBox.Items.Cast<string>().ToList();
 
             foreach (string serverName in serverNames)
@@ -423,7 +417,7 @@ namespace Wao
 
                     this.Invoke((MethodInvoker)delegate {
                         serverStatuses[serverName] = isOnline;
-                        serverListBox.Invalidate(); // Redraw to reflect the change
+                        serverListBox.Invalidate();
                     });
                 }
             }
@@ -532,14 +526,12 @@ namespace Wao
                 string apiUrl = "https://api.github.com/repos/Zintixx/MapleStory2-XML/releases/latest";
                 HttpClient client = new HttpClient();
 
-                // GitHub requires a user-agent for requests
                 client.DefaultRequestHeaders.Add("User-Agent", "MapleStory2-XML-Downloader");
 
                 var response = await client.GetStringAsync(apiUrl);
                 var releaseData = JObject.Parse(response);
                 var assets = releaseData["assets"];
 
-                // Find the necessary files in the assets
                 Dictionary<string, string> downloadUrls = new Dictionary<string, string>();
                 foreach (var asset in assets)
                 {
@@ -558,25 +550,21 @@ namespace Wao
                     return;
                 }
 
-                // Track the download stage
                 int fileCounter = 1;
                 int totalFiles = downloadUrls.Count;
 
-                // Download and replace the files
                 foreach (var fileUrl in downloadUrls)
                 {
                     string fileName = fileUrl.Key;
                     string destinationPath = Path.Combine(dataFolderPath, fileName);
 
-                    // Update the label with the current file and stage
                     UpdateLabelStatus($"{fileName} ({fileCounter}/{totalFiles})");
 
                     await DownloadFileAsync(fileUrl.Value, destinationPath);
 
-                    fileCounter++; // Increment the file counter after each download
+                    fileCounter++;
                 }
 
-                // Reset the status after completion
                 UpdateLabelStatus("Done!");
                 MessageBox.Show("Files downloaded and replaced successfully.");
             }
@@ -588,7 +576,6 @@ namespace Wao
 
         private void UpdateLabelStatus(string message)
         {
-            // Ensure the label update is on the UI thread
             if (InvokeRequired)
             {
                 Invoke(new Action<string>(UpdateLabelStatus), message);
@@ -621,7 +608,6 @@ namespace Wao
                         await fs.WriteAsync(buffer, 0, bytesRead);
                         totalBytesRead += bytesRead;
 
-                        // If we know the total size of the file, update the progress bar
                         if (totalBytes != -1)
                         {
                             int progressPercentage = (int)((totalBytesRead * 100) / totalBytes);
@@ -634,7 +620,6 @@ namespace Wao
 
         private void UpdateProgressBar(int progressPercentage)
         {
-            // Ensure this runs on the UI thread
             if (InvokeRequired)
             {
                 Invoke(new Action<int>(UpdateProgressBar), progressPercentage);
